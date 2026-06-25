@@ -27,7 +27,7 @@ Tracks how long each application window is focused, detects idle time (AFK), sup
 
 ### Daemon + Client
 
-- **Daemon** (`zxtracker daemon`): runs in background, collects focus data every tick via niri's event stream (push mode) with automatic fallback to 1s polling
+- **Daemon** (`track daemon`): runs in background, collects focus data every tick via niri's event stream (push mode) with automatic fallback to 1s polling
 - **Client**: all other subcommands either talk to the daemon via Unix socket for real-time data, or read SQLite directly for historical queries
 
 ### Focus Tracking Strategy
@@ -106,7 +106,7 @@ cd ZXTracker
 cargo build --release
 ```
 
-Binary is at `./target/release/zxtracker`.
+Binary is at `./target/release/track`.
 
 ### Dependencies
 
@@ -119,16 +119,16 @@ Binary is at `./target/release/zxtracker`.
 ### 1. Start the daemon
 
 ```bash
-zxtracker daemon
+track daemon
 ```
 
-Data stored at `~/.local/share/zxtracker/zxtracker.db`.  
-Socket at `$XDG_RUNTIME_DIR/zxtracker.sock` or `/tmp/zxtracker.sock`.
+Data stored at `~/.local/share/track/track.db`.  
+Socket at `$XDG_RUNTIME_DIR/track.sock` or `/tmp/track.sock`.
 
 ### 2. Real-time dashboard
 
 ```bash
-zxtracker status
+track status
 ```
 
 Htop-style alternate buffer display. Shows:
@@ -141,22 +141,22 @@ Press `Ctrl+C` to exit.
 ### 3. Today's report
 
 ```bash
-zxtracker today
+track today
 ```
 
 ### 4. Weekly / Monthly report
 
 ```bash
-zxtracker report          # defaults to --week
-zxtracker report --week
-zxtracker report --month
+track report          # defaults to --week
+track report --week
+track report --month
 ```
 
 ### 5. Interactive analysis
 
 ```bash
-zxtracker analyze         # defaults to 7 days
-zxtracker analyze --days 14
+track analyze         # defaults to 7 days
+track analyze --days 14
 ```
 
 Four views, switch with `←` `→` or `1-4`:
@@ -174,26 +174,26 @@ Press `q` or `Esc` to exit.
 
 ```bash
 # Tag an application
-zxtracker tag firefox 摸鱼
-zxtracker tag code-oss 写代码
-zxtracker tag discord 摸鱼
+track tag firefox 摸鱼
+track tag code-oss 写代码
+track tag discord 摸鱼
 
 # List all tags
-zxtracker tags
+track tags
 
 # Query usage by label (today)
-zxtracker label 摸鱼
+track label 摸鱼
 
 # Query usage by label (this week)
-zxtracker label 摸鱼 --week
+track label 摸鱼 --week
 
 # Remove a tag
-zxtracker untag discord 摸鱼
+track untag discord 摸鱼
 ```
 
 ## Output Examples
 
-### `zxtracker today`
+### `track today`
 
 ```
 Today
@@ -207,7 +207,7 @@ APP                                 TIME    TIMES
   Total:                        4h 35m 45s
 ```
 
-### `zxtracker label 摸鱼`
+### `track label 摸鱼`
 
 ```
 [摸鱼] label usage
@@ -218,7 +218,7 @@ APP                                 TIME    TIMES
   Total:                           1h 50m 27s
 ```
 
-### `zxtracker analyze --7d` (interactive TUI)
+### `track analyze --7d` (interactive TUI)
 
 ```
 ZXTracker — 7-Day Analysis  |  ← → switch view  |  q quit
@@ -244,7 +244,7 @@ APP                                  TIME  ACTIVATIONS
 
 | Item | Path |
 |------|------|
-| SQLite database | `~/.local/share/zxtracker/zxtracker.db` |
-| Unix socket | `$XDG_RUNTIME_DIR/zxtracker.sock` or `/tmp/zxtracker.sock` |
+| SQLite database | `~/.local/share/track/track.db` |
+| Unix socket | `$XDG_RUNTIME_DIR/track.sock` or `/tmp/track.sock` |
 
 The database uses WAL journal mode for concurrent read access (daemon writes, client reads simultaneously).

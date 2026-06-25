@@ -9,7 +9,7 @@ keywords = ["niri", "wayland", "tracker", "productivity", "time"]
 categories = ["command-line-utilities"]
 
 [[bin]]
-name = "zxtracker"
+name = "track"
 path = "src/main.rs"
 
 [dependencies]

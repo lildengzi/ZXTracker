@@ -16,5 +16,5 @@ jobs:
       - run: cargo build --release --locked
       - uses: softprops/action-gh-release@v2
         with:
-          files: target/release/zxtracker
+          files: target/release/track
           generate_release_notes: true
