@@ -92,6 +92,7 @@ pub fn run(db_path: &str, socket_path: &str) -> anyhow::Result<()> {
             if Some(&new_key) != last_app_pid.as_ref() {
                 last_app_pid = Some(new_key.clone());
                 commit(&db, &desktop_db, &mut pending, &mut active, now);
+                today_seconds = load_today(&db);
                 pending = Some(PendingSession {
                     app_id: event.app_id.clone(),
                     pid: event.pid,
@@ -99,7 +100,6 @@ pub fn run(db_path: &str, socket_path: &str) -> anyhow::Result<()> {
                     started: now,
                 });
             }
-            today_seconds = load_today(&db);
         }
 
         if let Some(ref p) = &pending {
@@ -112,6 +112,7 @@ pub fn run(db_path: &str, socket_path: &str) -> anyhow::Result<()> {
                             path: p.path.clone(), db_id,
                         });
                         pending = None;
+                        today_seconds = load_today(&db);
                     }
                     Err(e) => eprintln!("[zxtracker] session insert error: {}", e),
                 }
