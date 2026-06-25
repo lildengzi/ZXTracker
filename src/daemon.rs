@@ -54,7 +54,7 @@ pub fn run(db_path: &str, socket_path: &str) -> anyhow::Result<()> {
         today_usage: Vec::new(), weekly_usage: Vec::new(), tags: Vec::new(),
     }));
 
-    crate::ipc::serve(shared.clone(), db.clone(), socket_path)?;
+    crate::ipc::serve(shared.clone(), db.clone(), quit.clone(), socket_path)?;
 
     let desktop_db = DesktopDB::new();
     let app_meta = db.get_all_app_meta().unwrap_or_default();

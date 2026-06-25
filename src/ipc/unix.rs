@@ -4,11 +4,13 @@ use crate::ipc::{IpcRequest, IpcResponse, SharedState};
 use chrono::Local;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub fn serve(
     state: Arc<Mutex<SharedState>>,
     db: Arc<Database>,
+    quit: Arc<AtomicBool>,
     socket_path: &str,
 ) -> anyhow::Result<()> {
     let _ = std::fs::remove_file(socket_path);
@@ -18,7 +20,7 @@ pub fn serve(
     std::thread::spawn(move || {
         for stream in listener.incoming() {
             match stream {
-                Ok(stream) => handle(&state, &db, stream),
+                Ok(stream) => handle(&state, &db, &quit, stream),
                 Err(_) => break,
             }
         }
@@ -28,7 +30,7 @@ pub fn serve(
     Ok(())
 }
 
-fn handle(state: &Arc<Mutex<SharedState>>, db: &Database, mut stream: UnixStream) {
+fn handle(state: &Arc<Mutex<SharedState>>, db: &Database, quit: &Arc<AtomicBool>, mut stream: UnixStream) {
     let mut reader = BufReader::new(stream.try_clone().unwrap());
     let mut line = String::new();
     if reader.read_line(&mut line).is_err() {
@@ -49,6 +51,10 @@ fn handle(state: &Arc<Mutex<SharedState>>, db: &Database, mut stream: UnixStream
         "get_weekly" => handle_get_weekly(db),
         "get_hourly" => handle_get_hourly(db),
         "get_tags" => handle_get_tags(db),
+        "shutdown" => {
+            quit.store(true, Ordering::SeqCst);
+            IpcResponse { ok: true, error: String::new(), data: None }
+        }
         _ => IpcResponse { ok: false, error: format!("unknown cmd: {}", req.cmd), data: None },
     };
 

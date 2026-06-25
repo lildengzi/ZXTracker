@@ -43,6 +43,8 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     Daemon,
+    /// Stop the running daemon
+    Stop,
     Status,
     Today,
     Report {
@@ -84,10 +86,21 @@ fn main() -> Result<()> {
             let endpoint = socket_path();
             #[cfg(target_os = "windows")]
             let endpoint = "zxtracker_pipe".to_string();
-            eprintln!("[zxtracker] daemon starting...");
-            eprintln!("[zxtracker] db: {}", db.display());
-            eprintln!("[zxtracker] endpoint: {}", endpoint);
+            eprintln!("[track] daemon starting...");
+            eprintln!("[track] db: {}", db.display());
+            eprintln!("[track] endpoint: {}", endpoint);
             daemon::run(db.to_str().unwrap(), &endpoint)
+        }
+        Command::Stop => {
+            if ipc_send("shutdown", &serde_json::json!({})).is_ok() {
+                println!("daemon stopped");
+            } else {
+                println!("daemon not reachable, trying pkill...");
+                std::process::Command::new("pkill")
+                    .args(["-f", "track daemon"])
+                    .status()?;
+            }
+            Ok(())
         }
         #[cfg(target_os = "linux")]
         Command::Status => cmd_status(),
