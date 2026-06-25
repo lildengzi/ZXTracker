@@ -50,11 +50,15 @@ pub fn run(db_path: &str, socket_path: &str) -> anyhow::Result<()> {
     db.close_active_sessions(chrono::Utc::now().timestamp())?;
 
     let shared = Arc::new(Mutex::new(SharedState {
-        app_id: String::new(), title: String::new(), is_idle: false,
-        today_usage: Vec::new(), weekly_usage: Vec::new(), tags: Vec::new(),
+        app_id: String::new(),
+        title: String::new(),
+        is_idle: false,
+        today_usage: Vec::new(),
+        weekly_usage: Vec::new(),
+        tags: Vec::new(),
     }));
 
-    crate::ipc::serve(shared.clone(), db.clone(), socket_path)?;
+    crate::ipc::serve(shared.clone(), db.clone(), quit.clone(), socket_path)?;
 
     let desktop_db = DesktopDB::new();
     let app_meta = db.get_all_app_meta().unwrap_or_default();
@@ -82,7 +86,14 @@ pub fn run(db_path: &str, socket_path: &str) -> anyhow::Result<()> {
             last_app_pid = None;
         }
         if is_idle {
-            update_shared(&shared, &desktop_db, &app_meta, today_seconds.clone(), "", true);
+            update_shared(
+                &shared,
+                &desktop_db,
+                &app_meta,
+                today_seconds.clone(),
+                "",
+                true,
+            );
             std::thread::sleep(Duration::from_millis(500));
             continue;
         }
@@ -108,8 +119,10 @@ pub fn run(db_path: &str, socket_path: &str) -> anyhow::Result<()> {
                 match db.start_session(&p.app_id, p.pid, &p.path, p.started) {
                     Ok(db_id) => {
                         active = Some(ActiveSession {
-                            app_id: p.app_id.clone(), pid: p.pid,
-                            path: p.path.clone(), db_id,
+                            app_id: p.app_id.clone(),
+                            pid: p.pid,
+                            path: p.path.clone(),
+                            db_id,
                         });
                         pending = None;
                         today_seconds = load_today(&db);
@@ -124,17 +137,36 @@ pub fn run(db_path: &str, socket_path: &str) -> anyhow::Result<()> {
         }
 
         let label = active.as_ref().map(|a| a.app_id.as_str()).unwrap_or("");
-        update_shared(&shared, &desktop_db, &app_meta, today_seconds.clone(), label, is_idle);
+        update_shared(
+            &shared,
+            &desktop_db,
+            &app_meta,
+            today_seconds.clone(),
+            label,
+            is_idle,
+        );
 
         std::thread::sleep(Duration::from_secs(1));
     }
 
-    commit(&db, &desktop_db, &mut pending, &mut active, chrono::Utc::now().timestamp());
+    commit(
+        &db,
+        &desktop_db,
+        &mut pending,
+        &mut active,
+        chrono::Utc::now().timestamp(),
+    );
     eprintln!("[zxtracker] daemon stopped");
     Ok(())
 }
 
-fn commit(db: &Database, desktop: &DesktopDB, pending: &mut Option<PendingSession>, active: &mut Option<ActiveSession>, now: i64) {
+fn commit(
+    db: &Database,
+    desktop: &DesktopDB,
+    pending: &mut Option<PendingSession>,
+    active: &mut Option<ActiveSession>,
+    now: i64,
+) {
     if let Some(ref p) = pending.take() {
         let duration = now - p.started;
         if duration >= DEBOUNCE_SECS {
@@ -155,8 +187,11 @@ fn commit(db: &Database, desktop: &DesktopDB, pending: &mut Option<PendingSessio
 
 fn load_today(db: &Database) -> HashMap<String, i64> {
     let today = Local::now().format("%Y-%m-%d").to_string();
-    db.today_usage(&today).unwrap_or_default()
-        .into_iter().map(|(app, secs, _)| (app, secs)).collect()
+    db.today_usage(&today)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(app, secs, _)| (app, secs))
+        .collect()
 }
 
 fn update_shared(
@@ -167,9 +202,14 @@ fn update_shared(
     label: &str,
     is_idle: bool,
 ) {
-    let mut sorted: Vec<(String, i64)> = today_seconds.iter().map(|(k, v)| (k.clone(), *v)).collect();
+    let mut sorted: Vec<(String, i64)> =
+        today_seconds.iter().map(|(k, v)| (k.clone(), *v)).collect();
     sorted.sort_by_key(|b| std::cmp::Reverse(b.1));
-    let display = if label.is_empty() { "[idle]".into() } else { desktop::resolve(label, "", desktop, app_meta) };
+    let display = if label.is_empty() {
+        "[idle]".into()
+    } else {
+        desktop::resolve(label, "", desktop, app_meta)
+    };
     if let Ok(mut s) = shared.lock() {
         s.app_id = label.to_string();
         s.title = display;

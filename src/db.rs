@@ -47,7 +47,9 @@ impl Database {
             PRAGMA foreign_keys = ON;
             ",
         )?;
-        Ok(Database { conn: Mutex::new(conn) })
+        Ok(Database {
+            conn: Mutex::new(conn),
+        })
     }
 
     pub fn start_session(&self, app_id: &str, pid: i64, path: &str, timestamp: i64) -> Result<i64> {
@@ -97,11 +99,7 @@ impl Database {
         Ok(result)
     }
 
-    pub fn range_usage(
-        &self,
-        from_date: &str,
-        to_date: &str,
-    ) -> Result<Vec<(String, i64, i64)>> {
+    pub fn range_usage(&self, from_date: &str, to_date: &str) -> Result<Vec<(String, i64, i64)>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT app_id,
@@ -146,11 +144,7 @@ impl Database {
         Ok(result)
     }
 
-    pub fn range_first_seen(
-        &self,
-        from_date: &str,
-        to_date: &str,
-    ) -> Result<Vec<(String, i64)>> {
+    pub fn range_first_seen(&self, from_date: &str, to_date: &str) -> Result<Vec<(String, i64)>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT app_id, CAST(AVG(first_seen) AS INTEGER) FROM (
@@ -182,9 +176,8 @@ impl Database {
 
     pub fn get_app_meta(&self, app_id: &str) -> Result<Option<(String, String)>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT display_name, icon_path FROM app_meta WHERE app_id = ?1",
-        )?;
+        let mut stmt =
+            conn.prepare("SELECT display_name, icon_path FROM app_meta WHERE app_id = ?1")?;
         let result = stmt
             .query_row(params![app_id], |row| Ok((row.get(0)?, row.get(1)?)))
             .ok();
@@ -193,9 +186,8 @@ impl Database {
 
     pub fn get_all_app_meta(&self) -> Result<std::collections::HashMap<String, String>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT app_id, display_name FROM app_meta WHERE display_name != ''",
-        )?;
+        let mut stmt =
+            conn.prepare("SELECT app_id, display_name FROM app_meta WHERE display_name != ''")?;
         let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
         let mut map = std::collections::HashMap::new();
         for (id, name) in rows.flatten() {
@@ -206,7 +198,10 @@ impl Database {
 
     pub fn add_tag(&self, app_id: &str, tag_name: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
-        conn.execute("INSERT OR IGNORE INTO tags (name) VALUES (?1)", params![tag_name])?;
+        conn.execute(
+            "INSERT OR IGNORE INTO tags (name) VALUES (?1)",
+            params![tag_name],
+        )?;
         conn.execute(
             "INSERT OR IGNORE INTO app_tags (app_id, tag_name) VALUES (?1, ?2)",
             params![app_id, tag_name],

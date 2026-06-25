@@ -34,7 +34,11 @@ fn socket_path() -> String {
 }
 
 #[derive(Parser)]
-#[command(name = "zxtracker", version = "0.3.0", about = "Window focus time tracker")]
+#[command(
+    name = "zxtracker",
+    version = "0.3.0",
+    about = "Window focus time tracker"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -43,6 +47,8 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     Daemon,
+    /// Stop the running daemon
+    Stop,
     Status,
     Today,
     Report {
@@ -84,10 +90,21 @@ fn main() -> Result<()> {
             let endpoint = socket_path();
             #[cfg(target_os = "windows")]
             let endpoint = "zxtracker_pipe".to_string();
-            eprintln!("[zxtracker] daemon starting...");
-            eprintln!("[zxtracker] db: {}", db.display());
-            eprintln!("[zxtracker] endpoint: {}", endpoint);
+            eprintln!("[track] daemon starting...");
+            eprintln!("[track] db: {}", db.display());
+            eprintln!("[track] endpoint: {}", endpoint);
             daemon::run(db.to_str().unwrap(), &endpoint)
+        }
+        Command::Stop => {
+            if ipc_send("shutdown", &serde_json::json!({})).is_ok() {
+                println!("daemon stopped");
+            } else {
+                println!("daemon not reachable, trying pkill...");
+                std::process::Command::new("pkill")
+                    .args(["-f", "track daemon"])
+                    .status()?;
+            }
+            Ok(())
         }
         #[cfg(target_os = "linux")]
         Command::Status => cmd_status(),
@@ -98,11 +115,11 @@ fn main() -> Result<()> {
             Ok(())
         }
         Command::Today => {
-        let db = Database::open(&db_path())?;
-        let today = Local::now().format("%Y-%m-%d").to_string();
-        print_usage_table("Today", &db.today_usage(&today)?);
-        Ok(())
-    }
+            let db = Database::open(&db_path())?;
+            let today = Local::now().format("%Y-%m-%d").to_string();
+            print_usage_table("Today", &db.today_usage(&today)?);
+            Ok(())
+        }
         Command::Report { month, week: _ } => cmd_report(month),
         Command::Analyze { days, seven } => {
             let d = if seven { 7u32 } else { days };
@@ -124,7 +141,9 @@ fn main() -> Result<()> {
             let db = Database::open(&db_path())?;
             for (name, apps) in db.list_tags()? {
                 println!("[{}]", name);
-                for a in apps { println!("  - {}", a); }
+                for a in apps {
+                    println!("  - {}", a);
+                }
             }
             Ok(())
         }
@@ -133,7 +152,9 @@ fn main() -> Result<()> {
             let today = Local::now().format("%Y-%m-%d").to_string();
             if week {
                 let from = (chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d")?
-                    - chrono::Duration::days(6)).format("%Y-%m-%d").to_string();
+                    - chrono::Duration::days(6))
+                .format("%Y-%m-%d")
+                .to_string();
                 print_label_usage(&name, &db.labeled_range_usage(&name, &from, &today)?);
             } else {
                 print_label_usage(&name, &db.labeled_usage(&name, &today)?);
@@ -161,14 +182,24 @@ fn cmd_status() -> Result<()> {
                 let title = data["title"].as_str().unwrap_or("");
                 let is_idle = data["is_idle"].as_bool().unwrap_or(false);
                 let usage: Vec<(String, i64)> = data["today_usage"]
-                    .as_array().map(|a| a.iter().filter_map(|v| {
-                        Some((v["app_id"].as_str()?.to_string(), v["seconds"].as_i64()?))
-                    }).collect()).unwrap_or_default();
+                    .as_array()
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|v| {
+                                Some((v["app_id"].as_str()?.to_string(), v["seconds"].as_i64()?))
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
                 render::render_dashboard(&mut stdout, title, app_id, is_idle, &usage)?;
             }
             Err(_) => {
                 let sock = socket_path();
-                write!(stdout, "\x1b[H\x1b[Jdaemon not running ({} not found)\x1b[K", sock)?;
+                write!(
+                    stdout,
+                    "\x1b[H\x1b[Jdaemon not running ({} not found)\x1b[K",
+                    sock
+                )?;
                 stdout.flush()?;
             }
         }
@@ -179,16 +210,23 @@ fn cmd_status() -> Result<()> {
     Ok(())
 }
 
-
 fn cmd_report(month: bool) -> Result<()> {
     let db = Database::open(&db_path())?;
     let today = Local::now().format("%Y-%m-%d").to_string();
     let (from, label) = if month {
-        ((chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d")?
-            - chrono::Duration::days(29)).format("%Y-%m-%d").to_string(), "Month")
+        (
+            (chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d")? - chrono::Duration::days(29))
+                .format("%Y-%m-%d")
+                .to_string(),
+            "Month",
+        )
     } else {
-        ((chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d")?
-            - chrono::Duration::days(6)).format("%Y-%m-%d").to_string(), "Week")
+        (
+            (chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d")? - chrono::Duration::days(6))
+                .format("%Y-%m-%d")
+                .to_string(),
+            "Week",
+        )
     };
     print_usage_table(label, &db.range_usage(&from, &today)?);
     Ok(())
@@ -197,13 +235,20 @@ fn cmd_report(month: bool) -> Result<()> {
 #[cfg(target_os = "linux")]
 fn ipc_send(cmd: &str, args: &serde_json::Value) -> Result<serde_json::Value> {
     let mut stream = UnixStream::connect(socket_path())?;
-    let req = serde_json::to_string(&IpcRequest { cmd: cmd.to_string(), args: args.clone() })?;
+    let req = serde_json::to_string(&IpcRequest {
+        cmd: cmd.to_string(),
+        args: args.clone(),
+    })?;
     stream.write_all(req.as_bytes())?;
     stream.write_all(b"\n")?;
     let mut line = String::new();
     BufReader::new(&stream).read_line(&mut line)?;
     let resp: crate::ipc::IpcResponse = serde_json::from_str(&line)?;
-    if resp.ok { Ok(resp.data.unwrap_or(serde_json::json!({}))) } else { anyhow::bail!(resp.error) }
+    if resp.ok {
+        Ok(resp.data.unwrap_or(serde_json::json!({})))
+    } else {
+        anyhow::bail!(resp.error)
+    }
 }
 
 fn print_usage_table(label: &str, usage: &[(String, i64, i64)]) {
@@ -213,7 +258,12 @@ fn print_usage_table(label: &str, usage: &[(String, i64, i64)]) {
     println!("{:-<60}", "");
     let mut total = 0i64;
     for (app, secs, ct) in usage {
-        println!("  {:<30} {:>12} {:>8}", trun(app, 30), format_duration(*secs), ct);
+        println!(
+            "  {:<30} {:>12} {:>8}",
+            trun(app, 30),
+            format_duration(*secs),
+            ct
+        );
         total += secs;
     }
     println!("{:-<60}", "");
@@ -238,3 +288,4 @@ fn trun(s: &str, max: usize) -> &str {
         None => s,
     }
 }
+// test empty commit

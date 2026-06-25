@@ -4,8 +4,8 @@ use std::os::windows::ffi::OsStringExt;
 use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
 use windows_sys::Win32::System::ProcessStatus::GetModuleFileNameExW;
 use windows_sys::Win32::System::Threading::{
-    OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_NATIVE,
-    PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
+    OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_NATIVE, PROCESS_QUERY_INFORMATION,
+    PROCESS_VM_READ,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetForegroundWindow, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId,
@@ -61,7 +61,8 @@ fn get_process_path(pid: u32) -> String {
         }
         let mut buf = vec![0u16; 260];
         let mut len = buf.len() as u32;
-        let ok = QueryFullProcessImageNameW(handle, PROCESS_NAME_NATIVE, buf.as_mut_ptr(), &mut len);
+        let ok =
+            QueryFullProcessImageNameW(handle, PROCESS_NAME_NATIVE, buf.as_mut_ptr(), &mut len);
         CloseHandle(handle);
         if ok == 0 {
             return String::new();

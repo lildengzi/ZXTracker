@@ -33,5 +33,7 @@ pub fn poll_focused_window() -> Option<FocusEvent> {
 
 fn resolve_process_path(pid: i64) -> String {
     let path = format!("/proc/{}/exe", pid);
-    std::fs::read_link(&path).map(|p| p.display().to_string()).unwrap_or_default()
+    std::fs::read_link(&path)
+        .map(|p| p.display().to_string())
+        .unwrap_or_default()
 }
