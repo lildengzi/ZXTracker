@@ -9,12 +9,34 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            bin: track
+          - os: windows-latest
+            bin: track.exe
+    runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release --locked
+      - run: mv target/release/${{ matrix.bin }} ${{ matrix.bin }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}
+          path: ${{ matrix.bin }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
-          files: target/release/track
+          files: artifacts/track*
           generate_release_notes: true
